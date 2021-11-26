@@ -2,7 +2,8 @@
 #include <assert.h>  /* assert() */
 #include <errno.h>   /* errno, ERANGE */
 #include <math.h>    /* HUGE_VAL */
-#include <stdlib.h>  /* NULL, strtod() */
+#include <stdlib.h>  /* NULL, malloc(), realloc(), free(), strtod() */
+#include <string.h>  /* memcpy() */
 
 #define EXPECT(c, ch) do { assert(*c->json == (ch)); c->json++; } while(0)
 
@@ -65,10 +66,10 @@ static int lept_parse_number(lept_context* c, lept_value* v) {
     }
     
     errno = 0;
-    v->n = strtod(c->json, NULL);
+    v->u.n = strtod(c->json, NULL);
     if (errno == ERANGE && 
-        (v->n == HUGE_VAL || 
-         v->n == -HUGE_VAL )) {
+        (v->u.n == HUGE_VAL || 
+         v->u.n == -HUGE_VAL )) {
         return LEPT_PARSE_NUMBER_TOO_BIG;
     }
     c->json = p;
@@ -85,6 +86,14 @@ static int lept_parse_value(lept_context* c, lept_value* v) {
         default:    return lept_parse_number(c, v);
         case '\0':  return LEPT_PARSE_EXPECT_VALUE;
     }
+}
+
+void lept_free(lept_value* v) {
+    assert(v != NULL);
+    if (v->type == LEPT_STRING) {
+        free(v->u.s.s);
+    }
+    v->type = LEPT_NULL;
 }
 
 /* JSON-text = ws value ws */
@@ -115,5 +124,42 @@ lept_type lept_get_type(const lept_value* v) {
 
 double lept_get_number(const lept_value* v) {
     assert(v != NULL && v->type == LEPT_NUMBER);
-    return v->n;
+    return v->u.n;
+}
+
+void lept_set_number(lept_value* v, double n) {
+    lept_free(v);
+    v->u.n = n;
+    v->type = LEPT_NUMBER;
+}
+
+int lept_get_boolean(const lept_value* v) {
+    assert(v != NULL && (v->type == LEPT_FALSE || v->type == LEPT_TRUE));
+    return v->type == LEPT_TRUE;
+}
+
+void lept_set_boolean(lept_value* v, int b) {
+    lept_free(v);
+    v->type = b ? LEPT_TRUE : LEPT_FALSE;
+}
+
+void lept_set_string(lept_value* v, const char* s, size_t len) {
+    assert(v != NULL && (s != NULL || len == 0));
+    lept_free(v);
+    v->u.s.s = (char*)malloc(len + 1);
+    memcpy(v->u.s.s, s, len);
+    v->u.s.s[len] = '\0';
+    v->u.s.len = len;
+    v->type = LEPT_STRING;
+}
+
+
+const char* lept_get_string(const lept_value* v) {
+    assert(v != NULL && v->type == LEPT_STRING);
+    return v->u.s.s;
+}
+
+size_t lept_get_string_length(const lept_value* v) {
+    assert(v != NULL && v->type == LEPT_STRING);
+    return v->u.s.len;
 }
