@@ -21,7 +21,8 @@ enum {
     LEPT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET,
     LEPT_PARSE_MISS_KEY,
     LEPT_PARSE_MISS_COLON,
-    LEPT_PARSE_MISS_COMMA_OR_CURLY_BRACKET
+    LEPT_PARSE_MISS_COMMA_OR_CURLY_BRACKET,
+    LEPT_STRINGIFY_OK
 };
 
 typedef enum {
@@ -69,6 +70,7 @@ struct lept_member {
 void lept_free(lept_value* v);
 int lept_parse(lept_value* v, const char* json);
 lept_type lept_get_type(const lept_value* v);
+char* lept_stringify(const lept_value* v, size_t* length);
 
 int lept_get_boolean(const lept_value* v);
 void lept_set_boolean(lept_value* v, int b);
