@@ -44,12 +44,12 @@ struct lept_value {
     union {
         struct {
             lept_member* m;
-            size_t size;
+            size_t size, capacity;
         } o /* object */;
 
         struct {
             lept_value* e;
-            size_t size;
+            size_t size, capacity;
         } a; /* array */
 
         struct {
@@ -88,6 +88,15 @@ void lept_set_array(lept_value* v, size_t size);
 void lept_set_object(lept_value* v, size_t size);
 size_t lept_get_array_size(const lept_value* v);
 lept_value* lept_get_array_element(const lept_value* v, size_t index);
+size_t lept_get_array_capacity(const lept_value* v);
+void lept_reserve_array(lept_value* v, size_t capacity);
+void lept_shrink_array(lept_value* v);
+lept_value* lept_pushback_array_element(lept_value* v);
+void lept_popback_array_element(lept_value* v);
+lept_value* lept_insert_array_element(lept_value* v, size_t index);
+void lept_erase_array_element(lept_value* v, size_t index, size_t count);
+void lept_clear_array(lept_value* v);
+
 
 lept_value* lept_set_object_value(lept_value* v, const char* key, size_t klen);
 size_t lept_get_object_size(const lept_value* v);

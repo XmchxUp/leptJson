@@ -36,6 +36,57 @@ static int test_pass = 0;
         EXPECT_EQ_INT(LEPT_NULL, lept_get_type(&v));\
     } while(0)
 
+#define TEST_NUMBER(expect, json)\
+    do {\
+        lept_value v;\
+        lept_init(&v);\
+        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, json));\
+        EXPECT_EQ_INT(LEPT_NUMBER, lept_get_type(&v));\
+        EXPECT_EQ_DOUBLE(expect, lept_get_number(&v));\
+        lept_free(&v);\
+    } while(0)
+
+#if defined(_MSC_VER)
+#define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect) == (actual), (size_t)expect, (size_t)actual, "%Iu")
+#else
+#define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect) == (actual), (size_t)expect, (size_t)actual, "%zu")
+#endif
+
+#define TEST_STRING(expect, json)\
+    do {\
+        lept_value v;\
+        lept_init(&v);\
+        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, json));\
+        EXPECT_EQ_INT(LEPT_STRING, lept_get_type(&v));\
+        EXPECT_EQ_STRING(expect, lept_get_string(&v), lept_get_string_length(&v));\
+        lept_free(&v);\
+    } while(0)
+
+#define TEST_ROUNDTRIP(json)\
+    do {\
+        lept_value v;\
+        char* json2;\
+        size_t length;\
+        lept_init(&v);\
+        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, json));\
+        json2 = lept_stringify(&v, &length);\
+        EXPECT_EQ_STRING(json, json2, length);\
+        lept_free(&v);\
+        free(json2);\
+    } while(0)
+
+#define TEST_EQUAL(json1, json2, equality) \
+    do {\
+        lept_value v1, v2;\
+        lept_init(&v1);\
+        lept_init(&v2);\
+        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v1, json1));\
+        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v2, json2));\
+        EXPECT_EQ_INT(equality, lept_is_equal(&v1, &v2));\
+        lept_free(&v1);\
+        lept_free(&v2);\
+    } while(0)
+
 static void test_parse_null() {
     lept_value v;
     lept_init(&v);
@@ -104,16 +155,6 @@ static void test_parse_invalid_unicode_surrogate() {
     TEST_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"");
 }
 
-#define TEST_NUMBER(expect, json)\
-    do {\
-        lept_value v;\
-        lept_init(&v);\
-        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, json));\
-        EXPECT_EQ_INT(LEPT_NUMBER, lept_get_type(&v));\
-        EXPECT_EQ_DOUBLE(expect, lept_get_number(&v));\
-        lept_free(&v);\
-    } while(0)
-
 static void test_parse_number() {
     TEST_NUMBER(0.0, "-0");
     TEST_NUMBER(0.0, "-0.0");
@@ -177,16 +218,6 @@ static void test_parse_number_too_big() {
 #endif
 }
 
-#define TEST_STRING(expect, json)\
-    do {\
-        lept_value v;\
-        lept_init(&v);\
-        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, json));\
-        EXPECT_EQ_INT(LEPT_STRING, lept_get_type(&v));\
-        EXPECT_EQ_STRING(expect, lept_get_string(&v), lept_get_string_length(&v));\
-        lept_free(&v);\
-    } while(0)
-
 static void test_parse_string() {
     TEST_STRING("", "\"\"");
     TEST_STRING("Hello", "\"Hello\"");
@@ -243,11 +274,79 @@ static void test_access_number() {
     lept_free(&v);
 }
 
-#if defined(_MSC_VER)
-#define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect) == (actual), (size_t)expect, (size_t)actual, "%Iu")
-#else
-#define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect) == (actual), (size_t)expect, (size_t)actual, "%zu")
-#endif
+static void test_access_object() {
+    const char* json = "{\"a\":[1,2],\"b\":3}";
+    char *out;
+    lept_value v;
+    lept_init(&v);
+    lept_parse(&v, json);
+    lept_copy(
+        lept_find_object_value(&v, "b", 1),
+        lept_find_object_value(&v, "a", 1));
+    printf("%s\n", out = lept_stringify(&v, NULL)); /* {"a":[1,2],"b":[1,2]} */
+    free(out);
+
+    lept_parse(&v, json);
+    lept_move(
+        lept_find_object_value(&v, "b", 1),
+        lept_find_object_value(&v, "a", 1));
+    printf("%s\n", out = lept_stringify(&v, NULL)); /* {"a":null,"b":[1,2]} */
+    free(out);
+
+    lept_parse(&v, json);
+    lept_swap(
+        lept_find_object_value(&v, "b", 1),
+        lept_find_object_value(&v, "a", 1));
+    printf("%s\n", out = lept_stringify(&v, NULL)); /* {"a":3,"b":[1,2]} */
+    free(out);
+
+    lept_free(&v);
+}
+
+static void test_access_array() {
+    lept_value v;
+    size_t i, j;
+    lept_init(&v);
+    for (i = 0; i < 5; i++) {
+        lept_set_array(&v, i);
+        EXPECT_EQ_SIZE_T(0, lept_get_array_size(&v));
+        EXPECT_EQ_SIZE_T(i, lept_get_array_capacity(&v));
+        for (j = 0; j < 5; j++) {
+            lept_set_number(lept_pushback_array_element(&v), j);
+        }
+        EXPECT_EQ_SIZE_T(5, lept_get_array_size(&v));
+        for (j = 0; j < 5; j++) {
+            EXPECT_EQ_DOUBLE((double)j, lept_get_number(lept_get_array_element(&v, j)));
+        }
+    }
+
+    lept_popback_array_element(&v);
+    EXPECT_EQ_SIZE_T(4, lept_get_array_size(&v));
+    for (i = 0; i < 4; i++) {
+        EXPECT_EQ_DOUBLE((double)i, lept_get_number(lept_get_array_element(&v, i)));
+    }
+
+    lept_set_number(lept_insert_array_element(&v, 1), 10);
+    EXPECT_EQ_SIZE_T(5, lept_get_array_size(&v));
+    EXPECT_EQ_DOUBLE(0, lept_get_number(lept_get_array_element(&v, 0)));
+    EXPECT_EQ_DOUBLE(10, lept_get_number(lept_get_array_element(&v, 1)));
+    for (i = 1; i <= 3; i++) {
+        EXPECT_EQ_DOUBLE(i, lept_get_number(lept_get_array_element(&v, 1 + i)));
+    } /* [0, 10, 1, 2, 3] */
+
+    lept_erase_array_element(&v, 1, 2); /* [0, 2, 3] */
+    EXPECT_EQ_SIZE_T(3, lept_get_array_size(&v));
+    EXPECT_EQ_DOUBLE(0, lept_get_number(lept_get_array_element(&v, 0)));
+    EXPECT_EQ_DOUBLE(2, lept_get_number(lept_get_array_element(&v, 1)));
+    EXPECT_EQ_DOUBLE(3, lept_get_number(lept_get_array_element(&v, 2)));
+
+    lept_clear_array(&v);
+    lept_set_number(lept_pushback_array_element(&v), 10);
+    EXPECT_EQ_SIZE_T(1, lept_get_array_size(&v));
+    EXPECT_EQ_DOUBLE(10, lept_get_number(lept_get_array_element(&v, 0)));
+
+    lept_free(&v);
+}
 
 static void test_parse_array() {
     size_t i, j;
@@ -378,19 +477,6 @@ static void test_parse_miss_comma_or_curly_bracket() {
     TEST_ERROR(LEPT_PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":{}");
 }
 
-#define TEST_ROUNDTRIP(json)\
-    do {\
-        lept_value v;\
-        char* json2;\
-        size_t length;\
-        lept_init(&v);\
-        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, json));\
-        json2 = lept_stringify(&v, &length);\
-        EXPECT_EQ_STRING(json, json2, length);\
-        lept_free(&v);\
-        free(json2);\
-    } while(0)
-
 static void test_stringify_number() {
     TEST_ROUNDTRIP("0");
     TEST_ROUNDTRIP("-0");
@@ -441,18 +527,6 @@ static void test_stringify() {
     test_stringify_array();
     test_stringify_object();
 }
-
-#define TEST_EQUAL(json1, json2, equality) \
-    do {\
-        lept_value v1, v2;\
-        lept_init(&v1);\
-        lept_init(&v2);\
-        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v1, json1));\
-        EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v2, json2));\
-        EXPECT_EQ_INT(equality, lept_is_equal(&v1, &v2));\
-        lept_free(&v1);\
-        lept_free(&v2);\
-    } while(0)
 
 static void test_equal() {
     TEST_EQUAL("true", "true", 1);
@@ -522,35 +596,6 @@ static void test_swap() {
     lept_free(&v2);
 }
 
-static void test_object_op() {
-    const char* json = "{\"a\":[1,2],\"b\":3}";
-    char *out;
-    lept_value v;
-    lept_init(&v);
-    lept_parse(&v, json);
-    lept_copy(
-        lept_find_object_value(&v, "b", 1),
-        lept_find_object_value(&v, "a", 1));
-    printf("%s\n", out = lept_stringify(&v, NULL)); /* {"a":[1,2],"b":[1,2]} */
-    free(out);
-
-    lept_parse(&v, json);
-    lept_move(
-        lept_find_object_value(&v, "b", 1),
-        lept_find_object_value(&v, "a", 1));
-    printf("%s\n", out = lept_stringify(&v, NULL)); /* {"a":null,"b":[1,2]} */
-    free(out);
-
-    lept_parse(&v, json);
-    lept_swap(
-        lept_find_object_value(&v, "b", 1),
-        lept_find_object_value(&v, "a", 1));
-    printf("%s\n", out = lept_stringify(&v, NULL)); /* {"a":3,"b":[1,2]} */
-    free(out);
-
-    lept_free(&v);
-}
-
 static void test_parse() {
     test_parse_null();
     test_parse_true();
@@ -576,6 +621,8 @@ static void test_parse() {
     test_access_null();
     test_access_boolean();
     test_access_number();
+    test_access_object();
+    test_access_array();
 
     test_stringify();
 
@@ -583,7 +630,6 @@ static void test_parse() {
     test_move();
     test_copy();
     test_equal();
-    test_object_op();
 }
 
 int main() {
