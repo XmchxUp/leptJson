@@ -479,18 +479,21 @@ static void test_equal() {
     TEST_EQUAL("{\"a\":{\"b\":{\"c\":{}}}}", "{\"a\":{\"b\":{\"c\":{}}}}", 1);
     TEST_EQUAL("{\"a\":{\"b\":{\"c\":{}}}}", "{\"a\":{\"b\":{\"c\":[]}}}", 0);
 }
-#if 0
+
 static void test_copy() {
     lept_value v1, v2;
+    size_t len;
     lept_init(&v1);
     lept_parse(&v1, "{\"t\":true,\"f\":false,\"n\":null,\"d\":1.5,\"a\":[1,2,3]}");
     lept_init(&v2);
     lept_copy(&v2, &v1);
+    printf("%s\n", lept_stringify(&v1, &len));
+    printf("%s\n", lept_stringify(&v2, &len));
     EXPECT_TRUE(lept_is_equal(&v2, &v1));
     lept_free(&v1);
     lept_free(&v2);
 }
-
+#if 0
 static void test_move() {
     lept_value v1, v2, v3;
     lept_init(&v1);
@@ -519,6 +522,7 @@ static void test_swap() {
     lept_free(&v2);
 }
 #endif
+
 static void test_parse() {
     test_parse_null();
     test_parse_true();
@@ -549,8 +553,8 @@ static void test_parse() {
 #if 0
     test_swap();
     test_move();
-    test_copy();
 #endif
+    test_copy();
     test_equal();
 }
 

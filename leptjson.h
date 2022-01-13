@@ -71,6 +71,7 @@ struct lept_member {
 void lept_free(lept_value* v);
 int lept_parse(lept_value* v, const char* json);
 lept_type lept_get_type(const lept_value* v);
+void lept_copy(lept_value* dst, const lept_value* src);
 char* lept_stringify(const lept_value* v, size_t* length);
 
 int lept_get_boolean(const lept_value* v);
@@ -85,7 +86,6 @@ void lept_set_string(lept_value* v, const char* s, size_t len);
 
 size_t lept_get_array_size(const lept_value* v);
 lept_value* lept_get_array_element(const lept_value* v, size_t index);
-
 
 size_t lept_get_object_size(const lept_value* v);
 const char* lept_get_object_key(const lept_value* v, size_t index);
