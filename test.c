@@ -493,7 +493,7 @@ static void test_copy() {
     lept_free(&v1);
     lept_free(&v2);
 }
-#if 0
+
 static void test_move() {
     lept_value v1, v2, v3;
     lept_init(&v1);
@@ -521,7 +521,35 @@ static void test_swap() {
     lept_free(&v1);
     lept_free(&v2);
 }
-#endif
+
+static void test_object_op() {
+    const char* json = "{\"a\":[1,2],\"b\":3}";
+    char *out;
+    lept_value v;
+    lept_init(&v);
+    lept_parse(&v, json);
+    lept_copy(
+        lept_find_object_value(&v, "b", 1),
+        lept_find_object_value(&v, "a", 1));
+    printf("%s\n", out = lept_stringify(&v, NULL)); /* {"a":[1,2],"b":[1,2]} */
+    free(out);
+
+    lept_parse(&v, json);
+    lept_move(
+        lept_find_object_value(&v, "b", 1),
+        lept_find_object_value(&v, "a", 1));
+    printf("%s\n", out = lept_stringify(&v, NULL)); /* {"a":null,"b":[1,2]} */
+    free(out);
+
+    lept_parse(&v, json);
+    lept_swap(
+        lept_find_object_value(&v, "b", 1),
+        lept_find_object_value(&v, "a", 1));
+    printf("%s\n", out = lept_stringify(&v, NULL)); /* {"a":3,"b":[1,2]} */
+    free(out);
+
+    lept_free(&v);
+}
 
 static void test_parse() {
     test_parse_null();
@@ -550,12 +578,12 @@ static void test_parse() {
     test_access_number();
 
     test_stringify();
-#if 0
+
     test_swap();
     test_move();
-#endif
     test_copy();
     test_equal();
+    test_object_op();
 }
 
 int main() {

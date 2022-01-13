@@ -568,6 +568,19 @@ lept_value* lept_get_array_element(const lept_value* v, size_t index) {
     return &v->u.a.e[index];
 }
 
+lept_value* lept_set_object_value(lept_value* v, const char* key, size_t klen) {
+    size_t index = LEPT_KEY_NOT_EXIST;
+    index = lept_find_object_index(v, key, klen);
+    if (index != LEPT_KEY_NOT_EXIST) {
+        return &v->u.o.m[index].v;
+    }
+    v->u.o.m = realloc(v->u.o.m, (v->u.o.size + 1) * sizeof(lept_member));
+    v->u.o.m[v->u.o.size].k = (char*) malloc(sizeof(char) * (klen + 1));
+    strncpy(v->u.o.m[v->u.o.size].k, key, klen);
+    v->u.o.m[v->u.o.size].k[klen] = '\0';
+    return &v->u.o.m[v->u.o.size++].v;
+}
+
 size_t lept_get_object_size(const lept_value* v) {
     assert(v != NULL && v->type == LEPT_OBJECT);
     return v->u.o.size;
@@ -667,8 +680,10 @@ void lept_copy(lept_value* dst, const lept_value* src) {
             lept_set_object(dst, src->u.o.size);
             for (i = 0; i < src->u.o.size; i++) {
                 dst->u.o.m[i].klen = src->u.o.m[i].klen;
-                dst->u.o.m[i].k = (char*) malloc(sizeof(char) * dst->u.o.m[i].klen);
-                strcpy(dst->u.o.m[i].k, src->u.o.m[i].k);
+                dst->u.o.m[i].k = (char*) malloc(sizeof(char) * (dst->u.o.m[i].klen + 1));
+                strncpy(dst->u.o.m[i].k, src->u.o.m[i].k, dst->u.o.m[i].klen);
+                dst->u.o.m[i].k[dst->u.o.m[i].klen] = '\0';
+                lept_init(&dst->u.o.m[i].v);
                 lept_copy(&dst->u.o.m[i].v, &src->u.o.m[i].v);
             }
             break;
@@ -676,5 +691,22 @@ void lept_copy(lept_value* dst, const lept_value* src) {
             lept_free(dst);
             memcpy(dst, src, sizeof(lept_value));
             break;
+    }
+}
+
+void lept_move(lept_value* dst, lept_value* src) {
+    assert(dst != NULL && src != NULL && src != dst);
+    lept_free(dst);
+    memcpy(dst, src, sizeof(lept_value));
+    lept_init(src);
+}
+
+void lept_swap(lept_value* lhs, lept_value* rhs) {
+    lept_value temp;
+    assert(lhs != NULL && rhs != NULL);
+    if (lhs != rhs) {
+        memcpy(&temp, lhs, sizeof(lept_value));
+        memcpy(lhs, rhs, sizeof(lept_value));
+        memcpy(rhs, &temp, sizeof(lept_value));
     }
 }
